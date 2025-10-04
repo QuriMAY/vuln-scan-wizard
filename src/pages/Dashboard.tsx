@@ -4,10 +4,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Shield, LogOut, Play, AlertTriangle, CheckCircle, Info } from "lucide-react";
+import { Shield, LogOut, Play, AlertTriangle, CheckCircle, Info, Code } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface VulnerabilityResult {
   severity: "critical" | "high" | "medium" | "low" | "info";
@@ -21,6 +22,7 @@ const Dashboard = () => {
   const [code, setCode] = useState("");
   const [analyzing, setAnalyzing] = useState(false);
   const [results, setResults] = useState<VulnerabilityResult[]>([]);
+  const [correctedCode, setCorrectedCode] = useState("");
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -60,6 +62,7 @@ const Dashboard = () => {
 
     setAnalyzing(true);
     setResults([]);
+    setCorrectedCode("");
 
     try {
       const { data, error } = await supabase.functions.invoke("analyze-code", {
@@ -84,6 +87,7 @@ const Dashboard = () => {
         }
       } else if (data?.vulnerabilities) {
         setResults(data.vulnerabilities);
+        setCorrectedCode(data.correctedCode || "");
         toast({
           title: "Analysis complete",
           description: `Found ${data.vulnerabilities.length} potential issues`,
@@ -145,6 +149,7 @@ eval(userInput);`;
   const loadSample = () => {
     setCode(sampleCode);
     setResults([]);
+    setCorrectedCode("");
   };
 
   if (!user) {
@@ -242,43 +247,64 @@ eval(userInput);`;
                     <Skeleton className="h-24 w-full" />
                     <Skeleton className="h-24 w-full" />
                   </div>
-                ) : results.length > 0 ? (
-                  <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2">
-                    {results.map((result, index) => (
-                      <Card
-                        key={index}
-                        className="border-border/30 bg-background/50"
-                      >
-                        <CardHeader className="pb-3">
-                          <div className="flex items-center justify-between">
-                            <CardTitle className="text-base flex items-center gap-2">
-                              {getSeverityIcon(result.severity)}
-                              {result.title}
-                            </CardTitle>
-                            <Badge className={getSeverityColor(result.severity)}>
-                              {result.severity.toUpperCase()}
-                            </Badge>
-                          </div>
-                        </CardHeader>
-                        <CardContent className="space-y-3">
-                          <div>
-                            <p className="text-sm text-muted-foreground mb-2">
-                              <strong className="text-foreground">Issue:</strong>
-                            </p>
-                            <p className="text-sm">{result.description}</p>
-                          </div>
-                          <div>
-                            <p className="text-sm text-muted-foreground mb-2">
-                              <strong className="text-foreground">Recommendation:</strong>
-                            </p>
-                            <p className="text-sm text-secondary">
-                              {result.recommendation}
-                            </p>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
+                ) : results.length > 0 || correctedCode ? (
+                  <Tabs defaultValue="analysis" className="w-full">
+                    <TabsList className="grid w-full grid-cols-2">
+                      <TabsTrigger value="analysis">
+                        <AlertTriangle className="w-4 h-4 mr-2" />
+                        Issues
+                      </TabsTrigger>
+                      <TabsTrigger value="corrected">
+                        <Code className="w-4 h-4 mr-2" />
+                        Corrected Code
+                      </TabsTrigger>
+                    </TabsList>
+                    <TabsContent value="analysis" className="mt-4">
+                      <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2">
+                        {results.map((result, index) => (
+                          <Card
+                            key={index}
+                            className="border-border/30 bg-background/50"
+                          >
+                            <CardHeader className="pb-3">
+                              <div className="flex items-center justify-between">
+                                <CardTitle className="text-base flex items-center gap-2">
+                                  {getSeverityIcon(result.severity)}
+                                  {result.title}
+                                </CardTitle>
+                                <Badge className={getSeverityColor(result.severity)}>
+                                  {result.severity.toUpperCase()}
+                                </Badge>
+                              </div>
+                            </CardHeader>
+                            <CardContent className="space-y-3">
+                              <div>
+                                <p className="text-sm text-muted-foreground mb-2">
+                                  <strong className="text-foreground">Issue:</strong>
+                                </p>
+                                <p className="text-sm">{result.description}</p>
+                              </div>
+                              <div>
+                                <p className="text-sm text-muted-foreground mb-2">
+                                  <strong className="text-foreground">Recommendation:</strong>
+                                </p>
+                                <p className="text-sm text-secondary">
+                                  {result.recommendation}
+                                </p>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    </TabsContent>
+                    <TabsContent value="corrected" className="mt-4">
+                      <Textarea
+                        value={correctedCode}
+                        readOnly
+                        className="min-h-[500px] font-mono text-sm bg-input border-border resize-none"
+                      />
+                    </TabsContent>
+                  </Tabs>
                 ) : (
                   <div className="text-center py-12 text-muted-foreground">
                     <Shield className="w-12 h-12 mx-auto mb-4 opacity-50" />

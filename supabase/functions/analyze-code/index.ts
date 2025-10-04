@@ -32,7 +32,7 @@ serve(async (req) => {
         messages: [
           {
             role: 'system',
-            content: `You are an expert security analyst specializing in code vulnerability detection. Analyze the provided code for security issues and return a JSON array of vulnerabilities.
+            content: `You are an expert security analyst specializing in code vulnerability detection. Analyze the provided code for security issues and return a JSON object with vulnerabilities and a corrected version of the code.
 
 Each vulnerability should have:
 - severity: "critical" | "high" | "medium" | "low" | "info"
@@ -50,16 +50,12 @@ Common issues to check:
 - Weak cryptography
 - Missing access controls
 
+Also provide a corrected version of the code with all security issues fixed.
+
 Return ONLY a valid JSON object with this structure:
 {
-  "vulnerabilities": [
-    {
-      "severity": "critical",
-      "title": "SQL Injection",
-      "description": "Description here",
-      "recommendation": "Fix recommendation here"
-    }
-  ]
+  "vulnerabilities": [...],
+  "correctedCode": "The full corrected version of the code"
 }
 
 If no issues found, return:
@@ -71,7 +67,8 @@ If no issues found, return:
       "description": "The code appears to follow basic security practices.",
       "recommendation": "Continue monitoring for emerging vulnerabilities."
     }
-  ]
+  ],
+  "correctedCode": "The original code (no changes needed)"
 }`
           },
           {
@@ -84,7 +81,7 @@ If no issues found, return:
             type: "function",
             function: {
               name: "report_vulnerabilities",
-              description: "Report security vulnerabilities found in code",
+              description: "Report security vulnerabilities found in code and provide corrected version",
               parameters: {
                 type: "object",
                 properties: {
@@ -104,9 +101,13 @@ If no issues found, return:
                       required: ["severity", "title", "description", "recommendation"],
                       additionalProperties: false
                     }
+                  },
+                  correctedCode: {
+                    type: "string",
+                    description: "The corrected version of the code with all security vulnerabilities fixed"
                   }
                 },
-                required: ["vulnerabilities"],
+                required: ["vulnerabilities", "correctedCode"],
                 additionalProperties: false
               }
             }
@@ -140,14 +141,17 @@ If no issues found, return:
     const data = await response.json();
     console.log('AI response received');
     
-    // Extract vulnerabilities from tool call response
+    // Extract vulnerabilities and corrected code from tool call response
     const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
-    const vulnerabilities = toolCall?.function?.arguments 
-      ? JSON.parse(toolCall.function.arguments).vulnerabilities 
-      : [];
+    const args = toolCall?.function?.arguments 
+      ? JSON.parse(toolCall.function.arguments)
+      : { vulnerabilities: [], correctedCode: "" };
 
     return new Response(
-      JSON.stringify({ vulnerabilities }),
+      JSON.stringify({ 
+        vulnerabilities: args.vulnerabilities || [],
+        correctedCode: args.correctedCode || ""
+      }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
